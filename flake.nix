@@ -111,9 +111,40 @@
             sourceProvenance = [ sourceTypes.binaryNativeCode ];
           };
         };
+
+      # Shared module for NixOS and home manager.
+      # Allow for potential future service definitions etc.
+      mkModule = installPath: { config, lib, pkgs, ... }:
+        let
+          cfg = config.programs.blip;
+        in
+        {
+          options.programs.blip = {
+            enable = lib.mkEnableOption "Blip";
+
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = self.packages.${pkgs.system}.default;
+              defaultText = lib.literalExpression "blip.packages.\${pkgs.system}.default";
+              description = "The Blip package to use.";
+            };
+          };
+
+          config = lib.mkIf cfg.enable (lib.setAttrByPath installPath [ cfg.package ]);
+        };
+
+      # Package is unfree.
+      # Config change here does not affect the rest of the system
+      pkgsFor = system: import nixpkgs { inherit system; config.allowUnfree = true; };
     in
     {
-      packages.x86_64-linux.default  = mkBlip nixpkgs.legacyPackages.x86_64-linux;
-      packages.aarch64-linux.default = mkBlip nixpkgs.legacyPackages.aarch64-linux;
+      packages.x86_64-linux.default  = mkBlip (pkgsFor "x86_64-linux");
+      packages.aarch64-linux.default = mkBlip (pkgsFor "aarch64-linux");
+
+      # NixOS: installs into environment.systemPackages.
+      nixosModules.default = mkModule [ "environment" "systemPackages" ];
+
+      # Home Manager (for non-NixOS distros): installs into home.packages.
+      homeModules.default = mkModule [ "home" "packages" ];
     };
 }
