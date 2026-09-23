@@ -5,7 +5,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = "1.2.0";
+      version = "1.2.2";
 
       mkBlip = pkgs:
         let
@@ -13,12 +13,12 @@
           # calls pinned to the published tarball hashes.
           srcs = {
             x86_64-linux = pkgs.fetchurl {
-              url = "https://static.blip.net/linux/blip-1.2.0-linux-amd64.tar.gz";
-              sha256 = "c8fdb2910b59d6cc0984162b665902127528e28c47c01719c04af17e6e836340";
+              url = "https://static.blip.net/linux/blip-1.2.2-linux-amd64.tar.gz";
+              sha256 = "0dcb662b4279b94f7913efa3177c5c9a1f0f3431b9089411165f5fafb2309cf4";
             };
             aarch64-linux = pkgs.fetchurl {
-              url = "https://static.blip.net/linux/blip-1.2.0-linux-aarch64.tar.gz";
-              sha256 = "ff445c02a4edca8e89298ce2d45f120a6795feaba108ae5d2fca72a5d875fa41";
+              url = "https://static.blip.net/linux/blip-1.2.2-linux-aarch64.tar.gz";
+              sha256 = "38283f68e5c382f04d5a5bfb91f1cc849680ad1b437c7d4b9411f219129f0bae";
             };
           };
 
