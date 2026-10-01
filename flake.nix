@@ -124,8 +124,8 @@
 
             package = lib.mkOption {
               type = lib.types.package;
-              default = self.packages.${pkgs.system}.default;
-              defaultText = lib.literalExpression "blip.packages.\${pkgs.system}.default";
+              default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+              defaultText = lib.literalExpression "blip.packages.\${pkgs.stdenv.hostPlatform.system}.default";
               description = "The Blip package to use.";
             };
           };
