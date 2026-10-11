@@ -5,7 +5,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = "1.2.3";
+      version = "1.2.4";
 
       mkBlip = pkgs:
         let
@@ -13,12 +13,12 @@
           # calls pinned to the published tarball hashes.
           srcs = {
             x86_64-linux = pkgs.fetchurl {
-              url = "https://static.blip.net/linux/blip-1.2.3-linux-amd64.tar.gz";
-              sha256 = "6734e84294f128ac7db3b0ad0499e9996f84b20a5aa9836415b7370dcb7e610b";
+              url = "https://static.blip.net/linux/blip-1.2.4-linux-amd64.tar.gz";
+              sha256 = "9402ebb9ebed1fe65bc75982804594f2ab4e61b02c4398d045d0d52a4e71a4f8";
             };
             aarch64-linux = pkgs.fetchurl {
-              url = "https://static.blip.net/linux/blip-1.2.3-linux-aarch64.tar.gz";
-              sha256 = "3c582de658eff85fcbe9301b78774b862dc22f40401d777458d2126ac3f1c4a9";
+              url = "https://static.blip.net/linux/blip-1.2.4-linux-aarch64.tar.gz";
+              sha256 = "82f41dffce87a927a0e7b5b3d88b6213549ec6d904061254922fc625744a030d";
             };
           };
 
@@ -112,11 +112,37 @@
           };
         };
 
-      # Shared module for NixOS and home manager.
-      # Allow for potential future service definitions etc.
-      mkModule = installPath: { config, lib, pkgs, ... }:
+      # Shared package and login-autostart configuration for NixOS and Home Manager.
+      mkModule = { installPath, autostartPath }: { config, lib, pkgs, ... }:
         let
           cfg = config.programs.blip;
+          managedPkgs = pkgsFor pkgs.stdenv.hostPlatform.system;
+
+          # Keep the original package usable with app-managed autostart, while
+          # module installations leave startup settings under Nix's control.
+          managedPackage = managedPkgs.symlinkJoin {
+            name = "${cfg.package.name}-managed";
+            paths = [ cfg.package ];
+            nativeBuildInputs = [ managedPkgs.makeWrapper ];
+            postBuild = ''
+              wrapProgram $out/bin/blip --set BLIP_AUTOSTART external
+            '';
+            inherit (cfg.package) meta;
+          };
+
+          launcher = lib.getExe' managedPackage "blip";
+          autostartEntry = ''
+            [Desktop Entry]
+            Type=Application
+            Name=Blip
+            Comment=Auto-start Blip at login
+            Exec=${launcher} --background --delay 5
+            TryExec=${launcher}
+            Icon=net.blip.Blip
+            Terminal=false
+            X-GNOME-Autostart-enabled=${lib.boolToString cfg.autostart.enable}
+            Hidden=${lib.boolToString (!cfg.autostart.enable)}
+          '';
         in
         {
           options.programs.blip = {
@@ -124,13 +150,21 @@
 
             package = lib.mkOption {
               type = lib.types.package;
-              default = self.packages.${pkgs.system}.default;
-              defaultText = lib.literalExpression "blip.packages.\${pkgs.system}.default";
+              default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+              defaultText = lib.literalExpression "blip.packages.\${pkgs.stdenv.hostPlatform.system}.default";
               description = "The Blip package to use.";
+            };
+
+            autostart.enable = lib.mkEnableOption "starting Blip in the background at graphical login" // {
+              default = true;
             };
           };
 
-          config = lib.mkIf cfg.enable (lib.setAttrByPath installPath [ cfg.package ]);
+          config = lib.mkIf cfg.enable (lib.mkMerge [
+            (lib.setAttrByPath installPath [ managedPackage ])
+            # A disabled entry also masks system-wide entries with this filename.
+            (lib.setAttrByPath (autostartPath ++ [ "text" ]) autostartEntry)
+          ]);
         };
 
       # Package is unfree.
@@ -142,9 +176,15 @@
       packages.aarch64-linux.default = mkBlip (pkgsFor "aarch64-linux");
 
       # NixOS: installs into environment.systemPackages.
-      nixosModules.default = mkModule [ "environment" "systemPackages" ];
+      nixosModules.default = mkModule {
+        installPath = [ "environment" "systemPackages" ];
+        autostartPath = [ "environment" "etc" "xdg/autostart/net.blip.Blip.desktop" ];
+      };
 
       # Home Manager (for non-NixOS distros): installs into home.packages.
-      homeModules.default = mkModule [ "home" "packages" ];
+      homeModules.default = mkModule {
+        installPath = [ "home" "packages" ];
+        autostartPath = [ "xdg" "configFile" "autostart/net.blip.Blip.desktop" ];
+      };
     };
 }
